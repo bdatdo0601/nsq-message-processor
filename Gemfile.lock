@@ -1,0 +1,17 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    ffi (1.9.25)
+    nsq-cluster (2.1.0)
+      sys-proctable
+    sys-proctable (1.2.1)
+      ffi
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  nsq-cluster
+
+BUNDLED WITH
+   1.16.3
