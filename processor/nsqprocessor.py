@@ -136,7 +136,7 @@ class NsqProcessor(object):
         self.__requestProducerWriter.pub(topic, json.dumps(publishingData), onFinish)
 
     def start_running(self):
-        print "running"
+        print "Running"
         print "listening to request at: "
         for s in self.__http_input:
             print(s)
@@ -144,5 +144,5 @@ class NsqProcessor(object):
         nsq.run()
 
     def stop_running(self):
-        print "stopping" 
+        print "Stopping" 
         self.__intervalFunction.stop()
