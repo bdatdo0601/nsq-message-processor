@@ -1,108 +1,39 @@
-# Wistia Optimal Queuing Developer Challenge
+# Wistia Message Processor Challenge
 
-## Overview
+## Pre-requirement
 
-This project is about synchronizing large amounts of data between different services, something we do daily at Wistia. Imagine a system where messages are placed onto a queue; a processor takes messages off the queue, performs some operations on them, and publishes the results to the client. We're interested in developing a scalable and efficient processor.
+- [Ruby](https://www.ruby-lang.org/en/) - Local nsq cluster
+- [Ruby Bundler](https://bundler.io/) - Ruby gem dependencies manager
+- [Python 2.7](https://www.python.org/) - NSQ processor
+- [Python 3.7](https://www.python.org/) - For script that will send async requests of guid messages to a given endpoints
+        - [asyncio](https://docs.python.org/3/library/asyncio.html) - Asynchronous I/O
+        - [aiohttp](https://aiohttp.readthedocs.io/) - Allow making async http requests
+- [Pipenv](https://docs.pipenv.org/) - Python dependencies manager
 
-## Language Selection
+## Setup
 
-Please write this application in Ruby, Python, or Elixir. If you don't know any of these languages, give us a shout and we'll work with you to find a language that you know and we can evaluate.
+1. Install **Ruby**'s dependencies using `Bundler`: `bundle install`
+2. Install **Python**'s dependencies using `Pipenv`: `pipenv install`
 
-## System Description
+## Execution
 
-* Each message in the queue is a JSON string with a GUID video_id attribute, which is used by the client to identify a video.
-* Each message in the queue implies a "play" event for the video_id it references.
-* The processor is responsible for reading each message off the queue, updating the play count of the respective video, and publishing the result to the client.
+1. execute `main.py` with **python 2.7** to run an instance of NSQ processor with NSQ cluster:
+    ```bash
+    python main.py <amount of desired nsqd nodes> <amount of desired nsqlookupd nodes>
+    ```
+2. Once excuted, the instance will response with a list of address into shell output, this will be addresses for incoming requests
+3. To emulate 100000 requst, use **python 3.7** to execute `datagenerator.py`
+    ```bash
+    python3 datagenerator.py <endpoints-to-send-requests-to(ex: 127.0.0.1:4251)>
+    ```
+4. The output will be printed both into shell output and also to `output.txt`
 
-## System Constraints
+## Testing
 
-* There are 100,000 messages on the queue combined for 100 videos. Some videos have more plays than other videos. You can decide on the distribution of 100,000 plays across the 100 videos, but ensure there are at least 15 videos with fewer than 100 plays each.
-* For videos with fewer than 100 plays, the processor needs to the publish the result to the client as soon as a play is received for one because with such a small sample size, each play is of the utmost "realtime" importance.
-* For videos with 100 or more plays, each play is a little less significant, and so their stats do not need to be as "realtime." Rather, the client just needs to have the total play count for these videos up to date for the last 1 minute, i.e. each message that arrives on the queue must manifest as a change in the total play count for the associated video_id within 1 minute of arriving on the queue.
-* Each time the processor publishes (i.e. makes a call to) to the client, it can provide updated play counts for at most 20 videos in a single message.
-* An updated play count for a video should only be published to the client if the play count for that video has changed since it was last published.
-* The goal is to minimize the number of times the processor publishes its results to the client. Imagine that the cost of each request made is high.
+To test the functionality of the whole flow, simply execute `main.test.py` with **Python 2.7**.
+The script will instantiate a processor instance, send a few request to it based on a guid dictionary.
+It will then gather the response to recompose the dictionary and compare it against the original data.
 
-## Your Task
-
-Based on the aforementioned constraints, write a script that produces messages onto a queue, and create the processor that consumes from that queue and publishes its results to the client.
-
-## Notes
-
-* We recommend using [NSQ](http://nsq.io/), a simple distributed messaging platform. We use this at Wistia for a variety of data ingestion problems. Client libraries are available for [Ruby](https://github.com/wistia/nsq-ruby), [Python](https://github.com/nsqio/pynsq), and [Elixir](https://github.com/wistia/elixir_nsq).
-* We recommend [nsq-cluster](https://github.com/wistia/nsq-cluster) to set up your NSQ cluster.
-* Publishing to the client can be as trivial as logging to STDOUT or as complex as a webpage that updates with the total play count of each video. This is totally up to you!
-* Please reach out to robby@wistia.com and ryan@wistia.com if you have any questions or would like further clarification.
-
-## Python Users
-We recommend using the [pynsq client library](https://github.com/nsqio/pynsq).
-
-You can use the following script to confirm that NSQ is set up correctly on your system.
-
-```python
-import nsq
-import tornado.ioloop
-import time
-
-def pub_message():
-    writer.pub('test', time.strftime('%H:%M:%S'), finish_pub)
-
-def finish_pub(conn, data):
-    print(data)
-
-
-buf = []
-
-def process_message(message):
-    global buf
-    message.enable_async()
-    # cache the message for later processing
-    buf.append(message)
-    if len(buf) >= 3:
-        for msg in buf:
-            print msg.body
-            msg.finish()
-        buf = []
-    else:
-        print 'deferring processing'
-
-r = nsq.Reader(message_handler=process_message,
-        nsqd_tcp_addresses=['127.0.0.1:4150'],
-        topic='test', channel='async', max_in_flight=9)
-
-
-writer = nsq.Writer(['127.0.0.1:4150'])
-tornado.ioloop.PeriodicCallback(pub_message, 1000).start()
-nsq.run()
+```bash
+python main.test.py
 ```
-
-Your output should look something like this
-```shell
-OK
-deferring processing
-OK
-deferring processing
-OK
-19:54:09
-19:54:10
-19:54:11
-OK
-deferring processing
-OK
-deferring processing
-OK
-19:54:12
-19:54:13
-19:54:14
-OK
-deferring processing
-OK
-deferring processing
-OK
-19:54:15
-19:54:16
-19:54:17
-...
-```
-
-Best of luck!

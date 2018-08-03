@@ -111,7 +111,9 @@ class NsqProcessor(object):
     # it will immediate convert them into a appropriate format
     # before sending it to publish node
     def __onFastLaneHandler(self, message):
+        message.enable_async()
         data = json.loads(message.body)
+        message.finish()
         publishingData = { data["guid"]: data["count"]  }
         self.__fastLaneWriter.pub(TOPIC["PUBLISH"], json.dumps(publishingData), onFinish)
         return True
@@ -121,11 +123,13 @@ class NsqProcessor(object):
     # whenever the cache reach the length of 20 id
     # it will perform send all 20 of them to publish node              
     def __onSlowLaneHandler(self, message):
+        message.enable_async()
         data = json.loads(message.body)
+        message.finish()
         self.__slowLaneCache[data["guid"]] = data["count"]
         if (len(self.__slowLaneCache) >= self.__slowLaneCacheLimit):
             self.__publishSlowLaneCache()
-        return True
+        
         
     # when a message pass through here
     # it will be considered as published
@@ -160,16 +164,19 @@ class NsqProcessor(object):
 
     # helper function to help propagate message to appropriate lane
     def pushMessage(self, rawData):
-        data = json.loads(rawData)
-        guid = data["guid"]
-        if (guid in self.__videoListCount):
-            self.__videoListCount[guid] += 1
-        else: 
-            self.__videoListCount[guid] = 1
-        count = self.__videoListCount[guid]
-        publishingData = { "guid": guid, "count": count  }
-        topic = TOPIC["FAST_LANE"] if count < self.__playCountToCacheThreshold else TOPIC["SLOW_LANE"]
-        self.__requestProducerWriter.pub(topic, json.dumps(publishingData), onFinish)
+        try:
+            data = json.loads(rawData)
+            guid = data["guid"]
+            if (guid in self.__videoListCount):
+                self.__videoListCount[guid] += 1
+            else: 
+                self.__videoListCount[guid] = 1
+            count = self.__videoListCount[guid]
+            publishingData = { "guid": guid, "count": count  }
+            topic = TOPIC["FAST_LANE"] if count < self.__playCountToCacheThreshold else TOPIC["SLOW_LANE"]
+            self.__requestProducerWriter.pub(topic, json.dumps(publishingData), onFinish)
+        except Exception as e:
+            pass
 
     # start the processor
     def start_running(self):

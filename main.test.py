@@ -45,4 +45,5 @@ class ProcessorUnitTesting(unittest.TestCase):
             mainProcess.terminate()
 
 if __name__ == "__main__":
+    print("Begin Testing, Approximate Time Required: ~70secs")
     unittest.main()
