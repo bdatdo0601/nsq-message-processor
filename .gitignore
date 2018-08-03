@@ -1,2 +1,5 @@
 shellTestNSQ/
 *.pyc
+__init__.pyc
+processor/__init.__.pyc
+processor/*.pyc

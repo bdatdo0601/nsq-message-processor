@@ -24,13 +24,20 @@ TOPIC = {
     "REQUEST": "REQUEST"
 }
 
+# placeholder for on finish data
 def onFinish(conn, data):
     pass
 
-
 class NsqProcessor(object):
+    # This will store guid along with its playcount,
+    # Whenever a property from here change, it will pass forward
+    # to publish accordingly
     __videoListCount = {}
+    # This is a cache for slow lane to buffer message up
+    # allowing lower priorty guid to bundle before publish
+    # (reducing the amount of response to clients)
     __slowLaneCache = {}
+    # Initialize processor
     def __init__(self, requestProducerAddrList,
                     fastLaneAddrList, slowLaneAddrList, 
                     requestConsumerAddrList, http_input,
@@ -56,19 +63,25 @@ class NsqProcessor(object):
         if os.path.exists(self.__outputfiledir):
             os.remove(self.__outputfiledir)
 
-
+    # initialize nsqlookupd address with topics
     def __initializeNsqlookupd(self):
         for nsqlookupd in self.nsqlookupdList:
             for topic in TOPIC:
                 requests.post(
                     "{nsqlookupdAddr}/topic/create?topic={topic}".format(nsqlookupdAddr=nsqlookupd, topic=topic))
 
+    # initialize nsqd writer
+    # although every nsqd can search through any nodes for a specific topic
+    # This processor establish a rule of write locally but read globally
     def __inititalizeNsqdWriters(self):
         # write locally since topic will be polled to nsqlookupd
         self.__requestProducerWriter = nsq.Writer(self.requestProducerAddrList)
         self.__fastLaneWriter = nsq.Writer(self.fastLaneAddrList)
         self.__slowLaneWriter = nsq.Writer(self.slowLaneAddrList)
 
+    # initialize nsq reader
+    # each cluster of nsqd will handle one of 4 task
+    # before propagate data or output data
     def __initializeNsqdReader(self):
         nsq.Reader(message_handler=self.__onFastLaneHandler,
                         nsqd_tcp_addresses=self.fastLaneAddrList,
@@ -94,20 +107,28 @@ class NsqProcessor(object):
                         topic=TOPIC["REQUEST"], channel="processor",
                         lookupd_poll_interval=1)
 
+    # when a message pass through here
+    # it will immediate convert them into a appropriate format
+    # before sending it to publish node
     def __onFastLaneHandler(self, message):
         data = json.loads(message.body)
         publishingData = { data["guid"]: data["count"]  }
         self.__fastLaneWriter.pub(TOPIC["PUBLISH"], json.dumps(publishingData), onFinish)
         return True
-                
+
+    # when a message pass through here
+    # it will immediate be cached in a dictionary
+    # whenever the cache reach the length of 20 id
+    # it will perform send all 20 of them to publish node              
     def __onSlowLaneHandler(self, message):
-        message
         data = json.loads(message.body)
         self.__slowLaneCache[data["guid"]] = data["count"]
         if (len(self.__slowLaneCache) >= self.__slowLaneCacheLimit):
             self.__publishSlowLaneCache()
         return True
         
+    # when a message pass through here
+    # it will be considered as published
     def __onPublishHandler(self, message):
         message.enable_async()
         # change method of output here
@@ -116,21 +137,28 @@ class NsqProcessor(object):
             outfile.write(message.body + "\n")
         message.finish()
     
+    # this will trigger after every timeDifference interval
+    # it will check the cache and publish all data in it
+    # This will ensure published message will always updated
+    # at most an interval away from its actual value
     def __tick(self):
         if (len(self.__slowLaneCache) > 0): 
             self.__publishSlowLaneCache() # publish slow lane cache
 
+    # helper function to publish message from cache
     def __publishSlowLaneCache(self):
         publishingData = self.__slowLaneCache.copy()
         self.__slowLaneCache.clear()
         self.__slowLaneWriter.pub(TOPIC["PUBLISH"], json.dumps(
             publishingData), onFinish)
 
+    # message will be received here
     def __onRequestHandler(self, message):
         message.enable_async()
         self.pushMessage(message.body)
         message.finish()
 
+    # helper function to help propagate message to appropriate lane
     def pushMessage(self, rawData):
         data = json.loads(rawData)
         guid = data["guid"]
@@ -143,11 +171,13 @@ class NsqProcessor(object):
         topic = TOPIC["FAST_LANE"] if count < self.__playCountToCacheThreshold else TOPIC["SLOW_LANE"]
         self.__requestProducerWriter.pub(topic, json.dumps(publishingData), onFinish)
 
+    # start the processor
     def start_running(self):
         print(json.dumps({ "address": self.__http_input }))
         print(self.__outputfiledir)
         self.__intervalFunction.start()
         nsq.run()
 
+    # stop the processor
     def stop_running(self):
         self.__intervalFunction.stop()

@@ -25,34 +25,23 @@ end
 # This will block execution until all components are fully up and running.
 @cluster = NsqCluster.new(nsqd_count: options[:nsqd].to_i, nsqlookupd_count: options[:nsqlookupd].to_i)
 
-# p "nsqlookupds"
-# cluster.nsqlookupd.each_with_index do |nslookupdElement, index|
-#     p "#{index}"
-#     p "http://#{nsqlookupdElement.host}:#{nsqlookupdElement.http_port}"
-#     p "tcp://#{nsqlookupdElement.host}:#{nsqlookupdElement.tcp_port}"
-# end
-
-# p "nsqds"
-# cluster.nsqd.each_with_index do |nsqdElement, index|
-#     p "#{index}"
-#     p "http://#{nsqdElement.host}:#{nsqdElement.tcp_port}"
-# end
-
 at_exit do 
+    print "[end]\n"
     # Tear down the whole cluster.
     @cluster.destroy()
 end
 
 # exit
 while cmd = STDIN.gets
-    # remove whitespaces:
+  # remove whitespaces:
   cmd.chop!
   # if command is "exit", terminate:
   if cmd == "exit"
     print "exiting"
+    print "[end]\n"
     break
   else
-    # print current status
+    # print cluster information
     if !@cluster.nil?
         portsData = {}
         portsData[:nsqd] = @cluster.nsqd.map { |nsqdInstance| "#{nsqdInstance.host}:#{nsqdInstance.tcp_port}"}

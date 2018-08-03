@@ -1,16 +1,27 @@
 import random
 import json
 import asyncio
+import argparse
 from aiohttp import ClientSession
 
-VIDEO_AMOUNT = 2
-MESSAGE_AMOUNT = 10
+"""
+DATAGENERATOR.PY
 
-LOW_COUNT_VIDEO_AMOUNT = 1
+This is a script to generate 100000 messages from 100 video_id with 10 low count
+video_id. The distribution is random and it is guarantee to have low count video
+"""
+
+parser = argparse.ArgumentParser("nsq data generator")
+parser.add_argument("address", help="address to send data to", type=str)
+argList = parser.parse_args()
+
+VIDEO_AMOUNT = 100
+MESSAGE_AMOUNT = 100000
+
+LOW_COUNT_VIDEO_AMOUNT = 10
 
 LOW_COUNT_VIDEO_LIST = random.sample(range(0, VIDEO_AMOUNT - 1), LOW_COUNT_VIDEO_AMOUNT)
-
-URL = "http://127.0.0.1:4251/pub?topic=REQUEST"
+URL = "http://{address}/pub?topic=REQUEST".format(address=str(argList.address))
 
 messageList = []
 videoCount = {}
@@ -37,7 +48,6 @@ async def makeRequests():
     tasks = []
     async with ClientSession() as session:
         for message in messageList:
-            print(message)
             task = asyncio.ensure_future(fetch(URL, message, session))
             tasks.append(task)
         print("sending")

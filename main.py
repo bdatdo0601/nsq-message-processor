@@ -4,6 +4,13 @@ import os
 from subprocess import Popen, PIPE, STDOUT
 from processor.nsqprocessor import NsqProcessor
 
+"""
+MAIN.PY
+
+This will instantiate a nsq cluster along with a processor
+that will listen to incoming messages
+"""
+
 parser = argparse.ArgumentParser("nsq processor")
 parser.add_argument(
     "nsqdAmt", help="amount of nsqd instances", type=int)
@@ -15,6 +22,7 @@ if (argList.nsqdAmt < argList.nsqlookupdAmt):
     print("Nsqlookupd amount should be smaller than nsqd amount")
     exit()
 
+# instatiate nsq cluster instance
 nsqClusterInstance = Popen(["ruby", "cluster/start.rb", "-n", str(argList.nsqdAmt), "-l", str(argList.nsqlookupdAmt)], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
 
 # get nsqClusterInstace
@@ -43,6 +51,7 @@ if (len(nsqClusterData) == 0):
     print("cannot instaniate the cluster")
     exit()
 
+
 try:
     # distribute nsqd into 4 roughly equal-size list
     nsqdList = [ [] for i in range(0, 4) ]
@@ -50,9 +59,9 @@ try:
     for nsqd in nsqClusterData["nsqd"]:
         nsqdList[index].append(nsqd)
         index = (index + 1) if (index < len(nsqdList) - 1) else 0
-
+    # create a file for message output
     outputFilePath = os.path.dirname(os.path.abspath(__file__)) + "/output.txt"
-
+    # instatiate processor
     processorInstance = NsqProcessor(requestProducerAddrList=nsqdList[0],
                             fastLaneAddrList=nsqdList[1], slowLaneAddrList=nsqdList[2],
                             requestConsumerAddrList=nsqdList[3], nsqlookupdList=nsqClusterData["nsqlookupd"],
@@ -64,7 +73,7 @@ try:
         print("Interrupted")
     finally:
         processorInstance.stop_running()
-        # write that line to slave's stdin
+        # exit the cluster
         nsqClusterInstance.stdin.write("exit\n")
 except Exception as e:
     print("Addresses Unavailable! Check Cluster")
