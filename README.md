@@ -2,13 +2,13 @@
 
 ## Pre-requirement
 
-- [Ruby](https://www.ruby-lang.org/en/) - Local nsq cluster
-- [Ruby Bundler](https://bundler.io/) - Ruby gem dependencies manager
-- [Python 2.7](https://www.python.org/) - NSQ processor
-- [Python 3.7](https://www.python.org/) - For script that will send async requests of guid messages to a given endpoints
-        - [asyncio](https://docs.python.org/3/library/asyncio.html) - Asynchronous I/O
-        - [aiohttp](https://aiohttp.readthedocs.io/) - Allow making async http requests
-- [Pipenv](https://docs.pipenv.org/) - Python dependencies manager
+- [Ruby](https://www.ruby-lang.org/en/): Local nsq cluster
+- [Ruby Bundler](https://bundler.io/): Ruby gem dependencies manager
+- [Python 2.7](https://www.python.org/): NSQ processor
+- [Python 3.7](https://www.python.org/): For script that will send async requests of guid messages to a given endpoints
+  - [asyncio](https://docs.python.org/3/library/asyncio.html): Asynchronous I/O
+  - [aiohttp](https://aiohttp.readthedocs.io/): Allow making async http requests
+- [Pipenv](https://docs.pipenv.org/): Python dependencies manager
 
 ## Setup
 
