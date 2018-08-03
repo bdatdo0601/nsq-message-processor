@@ -6,16 +6,16 @@ First of all, I want to thank you all for introduce me to the NSQ message passin
 
 When I first read through the prompt and have a reasonable understanding of the tools provided, I started out with planning some naive approach and work my way up to see if there is more optimization that I can do
 
-[firstapproach.jpg](images/firstapproach.jpg)
+![firstapproach.jpg](images/firstapproach.jpg)
 
 Above is my first approach, to have a single nsqd node as the processor and request handler. While this approach is straightforward, it is very inefficient and cannot scale horizontally.
 
-[secondapproach.jpg](images/secondapproach.jpg)
+![secondapproach.jpg](images/secondapproach.jpg)
 
 My second approach is more reasonable, as I have an extra nsqd node that will handle caching low priority (high amount of play count) videos. This introduce a more
 distributed system, as while requests are being received, processed messages can still be published.
 
-[finalapproach.jpg](images/finalapproach.jpg)
+![finalapproach.jpg](images/finalapproach.jpg)
 
 My final architecture is a lot similar to the second approach, with another node that will handle high priority count. Furthermore, for every interval (in this case 1 minute), the processor will look into the cache and published whatever message is in it. This is to ensure that client will always have at most 1 minute updated value from their value.
 
