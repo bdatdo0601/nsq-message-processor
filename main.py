@@ -1,5 +1,6 @@
 import json
 import argparse
+import os
 from subprocess import Popen, PIPE, STDOUT
 from processor.nsqprocessor import NsqProcessor
 
@@ -10,18 +11,21 @@ parser.add_argument(
     "nsqlookupdAmt", help="amount of nsqlookupd instances", type=int)
 argList = parser.parse_args()
 
-print "Launching Ruby instance"
+if (argList.nsqdAmt < argList.nsqlookupdAmt):
+    print("Nsqlookupd amount should be smaller than nsqd amount")
+    exit()
+
 nsqClusterInstance = Popen(["ruby", "cluster/start.rb", "-n", str(argList.nsqdAmt), "-l", str(argList.nsqlookupdAmt)], stdin=PIPE, stdout=PIPE, stderr=STDOUT)
 
 # get nsqClusterInstace
 nsqClusterData = {}
-# read output line by line, until we reach "[end]"
+# read output line by line
 while True:
     # send a command to get cluster data
     nsqClusterInstance.stdin.write("\n")
     # check if instance has terminated:
     if nsqClusterInstance.poll() is not None:
-        print "Cluster instance has terminated."
+        print("Cluster instance has terminated.")
         exit()
     # if not, get the next line response
     line = nsqClusterInstance.stdout.readline().rstrip()
@@ -36,7 +40,7 @@ while True:
         pass
 
 if (len(nsqClusterData) == 0):
-    print "cannot instaniate the cluster"
+    print("cannot instaniate the cluster")
     exit()
 
 try:
@@ -47,21 +51,23 @@ try:
         nsqdList[index].append(nsqd)
         index = (index + 1) if (index < len(nsqdList) - 1) else 0
 
+    outputFilePath = os.path.dirname(os.path.abspath(__file__)) + "/output.txt"
+
     processorInstance = NsqProcessor(requestProducerAddrList=nsqdList[0],
                             fastLaneAddrList=nsqdList[1], slowLaneAddrList=nsqdList[2],
                             requestConsumerAddrList=nsqdList[3], nsqlookupdList=nsqClusterData["nsqlookupd"],
-                            http_input=nsqClusterData["nsqd_http"])
+                            http_input=nsqClusterData["nsqd_http"],
+                            outputfiledir=outputFilePath)
     try:
         processorInstance.start_running()
     except KeyboardInterrupt:
-        print "Interrupted"
+        print("Interrupted")
     finally:
         processorInstance.stop_running()
         # write that line to slave's stdin
         nsqClusterInstance.stdin.write("exit\n")
 except Exception as e:
-    print e.message
-    print "Addresses Unavailable! Check Cluster"
+    print("Addresses Unavailable! Check Cluster")
 
 
 

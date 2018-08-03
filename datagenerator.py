@@ -3,10 +3,10 @@ import json
 import asyncio
 from aiohttp import ClientSession
 
-VIDEO_AMOUNT = 100
-MESSAGE_AMOUNT = 100000
+VIDEO_AMOUNT = 2
+MESSAGE_AMOUNT = 10
 
-LOW_COUNT_VIDEO_AMOUNT = 10
+LOW_COUNT_VIDEO_AMOUNT = 1
 
 LOW_COUNT_VIDEO_LIST = random.sample(range(0, VIDEO_AMOUNT - 1), LOW_COUNT_VIDEO_AMOUNT)
 
@@ -37,6 +37,7 @@ async def makeRequests():
     tasks = []
     async with ClientSession() as session:
         for message in messageList:
+            print(message)
             task = asyncio.ensure_future(fetch(URL, message, session))
             tasks.append(task)
         print("sending")

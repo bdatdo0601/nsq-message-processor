@@ -5,7 +5,8 @@ import json
 import functools
 import threading
 import requests
-from repeatedTimer import RepeatedTimer
+import os
+from .repeatedTimer import RepeatedTimer
 
 # INPUT MESSAGE FORMAT 
 # { guid: <vid_id> } --> { guid: <vid_id>, count: <count> }
@@ -25,8 +26,6 @@ TOPIC = {
 
 def onFinish(conn, data):
     pass
-    # print conn
-    # print data
 
 
 class NsqProcessor(object):
@@ -38,7 +37,8 @@ class NsqProcessor(object):
                     nsqlookupdList=[],
                     slowLaneCacheLimit=20,
                     playCountToCacheThreshold=100,
-                    timeDifferenceLimit=60):
+                    timeDifferenceLimit=60,
+                    outputfiledir=""):
         self.requestProducerAddrList = requestProducerAddrList
         self.fastLaneAddrList = fastLaneAddrList
         self.slowLaneAddrList = slowLaneAddrList
@@ -52,6 +52,10 @@ class NsqProcessor(object):
         self.__http_input = http_input
         self.__timeDifferenceLimit=timeDifferenceLimit
         self.__intervalFunction = RepeatedTimer(timeDifferenceLimit, self.__tick)
+        self.__outputfiledir=outputfiledir
+        if os.path.exists(self.__outputfiledir):
+            os.remove(self.__outputfiledir)
+
 
     def __initializeNsqlookupd(self):
         for nsqlookupd in self.nsqlookupdList:
@@ -69,25 +73,25 @@ class NsqProcessor(object):
         nsq.Reader(message_handler=self.__onFastLaneHandler,
                         nsqd_tcp_addresses=self.fastLaneAddrList,
                         lookupd_http_addresses=self.nsqlookupdList,
-                        topic=TOPIC["FAST_LANE"], channel="propagate",
+                        topic=TOPIC["FAST_LANE"], channel="processor",
                         max_in_flight=self.__slowLaneCacheLimit,
                         lookupd_poll_interval=1)
         nsq.Reader(message_handler=self.__onSlowLaneHandler,
                         nsqd_tcp_addresses=self.slowLaneAddrList,
                         lookupd_http_addresses=self.nsqlookupdList,
-                        topic=TOPIC["SLOW_LANE"], channel="cache",
+                        topic=TOPIC["SLOW_LANE"], channel="processor",
                         max_in_flight=self.__slowLaneCacheLimit,
                         lookupd_poll_interval=1)
         nsq.Reader(message_handler=self.__onPublishHandler,
                         nsqd_tcp_addresses=self.requestConsumerAddrList,
                         lookupd_http_addresses=self.nsqlookupdList,
-                        topic=TOPIC["PUBLISH"], channel="publish",
+                        topic=TOPIC["PUBLISH"], channel="processor",
                         max_in_flight=self.__slowLaneCacheLimit,
                         lookupd_poll_interval=1)
         nsq.Reader(message_handler=self.__onRequestHandler,
                         nsqd_tcp_addresses=self.requestProducerAddrList,
                         lookupd_http_addresses=self.nsqlookupdList,
-                        topic=TOPIC["REQUEST"], channel="receive",
+                        topic=TOPIC["REQUEST"], channel="processor",
                         lookupd_poll_interval=1)
 
     def __onFastLaneHandler(self, message):
@@ -97,6 +101,7 @@ class NsqProcessor(object):
         return True
                 
     def __onSlowLaneHandler(self, message):
+        message
         data = json.loads(message.body)
         self.__slowLaneCache[data["guid"]] = data["count"]
         if (len(self.__slowLaneCache) >= self.__slowLaneCacheLimit):
@@ -107,6 +112,8 @@ class NsqProcessor(object):
         message.enable_async()
         # change method of output here
         print(message.body)
+        with open(self.__outputfiledir, "a+") as outfile:
+            outfile.write(message.body + "\n")
         message.finish()
     
     def __tick(self):
@@ -120,8 +127,9 @@ class NsqProcessor(object):
             publishingData), onFinish)
 
     def __onRequestHandler(self, message):
+        message.enable_async()
         self.pushMessage(message.body)
-        return True
+        message.finish()
 
     def pushMessage(self, rawData):
         data = json.loads(rawData)
@@ -136,13 +144,10 @@ class NsqProcessor(object):
         self.__requestProducerWriter.pub(topic, json.dumps(publishingData), onFinish)
 
     def start_running(self):
-        print "Running"
-        print "listening to request at: "
-        for s in self.__http_input:
-            print(s)
+        print(json.dumps({ "address": self.__http_input }))
+        print(self.__outputfiledir)
         self.__intervalFunction.start()
         nsq.run()
 
     def stop_running(self):
-        print "Stopping" 
         self.__intervalFunction.stop()
